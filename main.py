@@ -6,8 +6,18 @@ from typing import Iterator
 
 import ballchasing
 
+
+if len(sys.argv) == 1:
+    print("Usage:")
+    print("python main.py [api key] [group id] [optional db file name]")
+
+
 api = ballchasing.Api(sys.argv[1])
-db = sqlite3.connect("ballchasing.db")
+
+db_name = "ballchasing.db"
+if len(sys.argv) > 3:
+    db_name = sys.argv[3]
+db = sqlite3.connect(db_name)
 
 
 def setup_db(db: sqlite3.Connection):
@@ -18,13 +28,26 @@ def setup_db(db: sqlite3.Connection):
     db.commit()
 
 
+def _get_team_names(replay: dict) -> dict[str, str]:
+    names = {"blue": "blue", "orange": "orange"}
+    if "name" in replay["blue"]:
+        names["blue"] = "blue"
+
+    if "name" in replay["orange"]:
+        names["orange"] = "orange"
+
+    return names
+
+
 def write_replay_to_db(db: sqlite3.Connection, replay: dict):
-    winner = replay["orange"]["name"]
+    team_names = _get_team_names(replay)
+
+    winner = team_names["orange"]
     if (
         replay["blue"]["stats"]["core"]["goals"]
         > replay["orange"]["stats"]["core"]["goals"]
     ):
-        winner = replay["blue"]["name"]
+        team_names["blue"]
 
     date = replay["date"]
     if replay["date_has_timezone"]:
@@ -53,7 +76,7 @@ def write_replay_to_db(db: sqlite3.Connection, replay: dict):
     )
     db.commit()
 
-    _write_team_stats_to_db(db, replay)
+    _write_team_stats_to_db(db, replay, team_names)
 
 
 def _insert_player_stat(
@@ -171,7 +194,7 @@ def _insert_player_stat(
     db.commit()
 
 
-def _insert_team_stat(db: sqlite3.Connection, replay_id: str, t: dict):
+def _insert_team_stat(db: sqlite3.Connection, replay_id: str, team_name: str, t: dict):
     db.execute(
         """
         insert into team_stats (team_name, team_color, replay_id, possession_time, time_in_side, shots, shots_against, goals, goals_against, saves, assists, score, shooting_percentage, bpm, bcpm, avg_amount, amount_collected, amount_stolen, amount_collected_big, amount_stolen_big, amount_collected_small, amount_stolen_small, count_collected_big, count_stolen_big, count_collected_small, count_stolen_small, amount_overfill, amount_overfill_stolen, amount_used_while_supersonic, time_zero_boost, time_full_boost, time_boost_0_25, time_boost_25_50, time_boost_50_75, time_boost_75_100, total_distance, time_supersonic_speed, time_boost_speed, time_slow_speed, time_ground, time_low_air, time_high_air, time_powerslide, count_powerslide, time_defensive_third, time_neutral_third, time_offensive_third, time_defensive_half, time_offensive_half, time_behind_ball, time_infront_ball, demos_inflicted, demos_taken)
@@ -179,7 +202,7 @@ def _insert_team_stat(db: sqlite3.Connection, replay_id: str, t: dict):
         ON CONFLICT DO NOTHING;
     """,
         (
-            t["name"],
+            team_name,
             t["color"],
             replay_id,
             # ball
@@ -243,17 +266,18 @@ def _insert_team_stat(db: sqlite3.Connection, replay_id: str, t: dict):
     db.commit()
 
 
-def _write_team_stats_to_db(db: sqlite3.Connection, replay: dict):
+def _write_team_stats_to_db(db: sqlite3.Connection, replay: dict, team_names: dict):
     for team_color in ["blue", "orange"]:
         _insert_team_stat(
             db,
             replay["id"],
+            team_names[team_color],
             replay[team_color],
         )
 
         for p in replay[team_color]["players"]:
             _insert_player_stat(
-                db, replay["id"], replay[team_color]["name"], team_color, p
+                db, replay["id"], team_names[team_color], team_color, p
             )
 
 
@@ -280,7 +304,7 @@ def get_group_replays(
 if __name__ == "__main__":
     setup_db(db)
 
-    replays = get_group_replays(api, "matches-0mda6b9qvw", deep=True)
+    replays = get_group_replays(api, sys.argv[2], deep=True)
 
     for replay in replays:
         try:
