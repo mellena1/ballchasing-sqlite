@@ -10,6 +10,7 @@ import ballchasing
 if len(sys.argv) == 1:
     print("Usage:")
     print("python main.py [api key] [group id] [optional db file name]")
+    sys.exit()
 
 
 api = ballchasing.Api(sys.argv[1])
@@ -31,10 +32,10 @@ def setup_db(db: sqlite3.Connection):
 def _get_team_names(replay: dict) -> dict[str, str]:
     names = {"blue": "blue", "orange": "orange"}
     if "name" in replay["blue"]:
-        names["blue"] = "blue"
+        names["blue"] = replay["blue"]["name"]
 
     if "name" in replay["orange"]:
-        names["orange"] = "orange"
+        names["orange"] = replay["orange"]["name"]
 
     return names
 
@@ -47,7 +48,7 @@ def write_replay_to_db(db: sqlite3.Connection, replay: dict):
         replay["blue"]["stats"]["core"]["goals"]
         > replay["orange"]["stats"]["core"]["goals"]
     ):
-        team_names["blue"]
+        winner = team_names["blue"]
 
     date = replay["date"]
     if replay["date_has_timezone"]:
@@ -82,6 +83,10 @@ def write_replay_to_db(db: sqlite3.Connection, replay: dict):
 def _insert_player_stat(
     db: sqlite3.Connection, replay_id: str, team_name: str, team_color: str, p: dict
 ):
+    # skip any player who accidentally joined a game
+    if p["stats"]["core"]["score"] == 0:
+        return
+
     # this is not included in the payload if it is 0
     goals_against_while_last_defender = 0
     if "goals_against_while_last_defender" in p["stats"]["positioning"]:
@@ -295,7 +300,7 @@ def get_group_replays(
     """
     child_groups = api.get_groups(group=group_id)
     for child in child_groups:
-        for replay in api.get_group_replays(child["id"], deep=deep):
+        for replay in get_group_replays(api, child["id"], deep=deep):
             yield replay
     for replay in api.get_replays(group_id=group_id, deep=deep):
         yield replay
