@@ -6,6 +6,8 @@ name = "pypi"
 [packages]
 python-ballchasing = "*"
 requests = "*"
+matplotlib = "*"
+tk = "*"
 
 [dev-packages]
 flake8 = "*"

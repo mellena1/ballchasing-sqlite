@@ -32,10 +32,10 @@ def setup_db(db: sqlite3.Connection):
 def _get_team_names(replay: dict) -> dict[str, str]:
     names = {"blue": "blue", "orange": "orange"}
     if "name" in replay["blue"]:
-        names["blue"] = replay["blue"]["name"]
+        names["blue"] = str(replay["blue"]["name"]).strip()
 
     if "name" in replay["orange"]:
-        names["orange"] = replay["orange"]["name"]
+        names["orange"] = str(replay["orange"]["name"]).strip()
 
     return names
 
